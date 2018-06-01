@@ -6,6 +6,12 @@ import (
 	"os/signal"
 	"syscall"
 	"log"
+	"flag"
+)
+
+var (
+	clientID = flag.String("clientID", "clientID001", "")
+	serverAddr = flag.String("serverAddr", "127.0.0.1:9992", "server addr")
 )
 
 func init()  {
@@ -13,7 +19,8 @@ func init()  {
 }
 
 func main() {
-	config := thorn.ClientConfig{"clientID001", "127.0.0.1:9992"}
+	flag.Parse()
+	config := thorn.ClientConfig{*clientID, *serverAddr}
 	client := thorn.NewClient(config)
 
 	client.Start()

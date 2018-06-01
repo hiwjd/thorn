@@ -6,6 +6,12 @@ import (
 	"os"
 	"syscall"
 	"log"
+	"flag"
+)
+
+var (
+	manageHTTPAddr = flag.String("mAddr", "127.0.0.1:9991", "http addr provide manage server")
+	controlTCPAddr = flag.String("cAddr", "127.0.0.1:9992", "tcp addr provide control server")
 )
 
 func init()  {
@@ -13,7 +19,8 @@ func init()  {
 }
 
 func main() {
-	config := thorn.NewServerConfig("127.0.0.1:9991", "127.0.0.1:9992")
+	flag.Parse()
+	config := thorn.NewServerConfig(*manageHTTPAddr, *controlTCPAddr)
 	server := thorn.NewServer(config)
 
 	server.Start()
