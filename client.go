@@ -14,12 +14,12 @@ import (
 //   处理服务端下发的命令
 //     与本地的某个端口建立连接后，连接pipe给服务端指定的端口
 type Client struct {
-	config ClientConfig
+	config *ClientConfig
 	buf []byte
 	in chan *Packet
 }
 
-func NewClient(config ClientConfig) *Client {
+func NewClient(config *ClientConfig) *Client {
 	return &Client{
 		config: config,
 		buf: make([]byte, 512),
@@ -28,13 +28,13 @@ func NewClient(config ClientConfig) *Client {
 }
 
 func (c *Client) Start() {
-	conn, err := net.Dial("tcp", c.config.ServerAddr)
+	conn, err := net.Dial("tcp", c.config.ServerAddr())
 	if err != nil {
 		log.Println(err)
 		return
 	}
 
-	body := RegClient{c.config.ClientID}
+	body := RegClient{c.config.ClientID()}
 	bs, err := json.Marshal(body)
 	if err != nil {
 		log.Println(err)
@@ -42,6 +42,7 @@ func (c *Client) Start() {
 	}
 
 	p := Packet{
+		Magic: MAGIC,
 		Version: VERSION_1,
 		Reserved: 0,
 		Cmd: CMD_REG_CLIENT,
@@ -87,13 +88,14 @@ func (c *Client) readLoop(conn net.Conn) {
 		}
 
 		p := &Packet{
+			Magic: MAGIC,
 			Version: version,
 			Reserved: reserved,
 			Cmd: cmd,
 			BodySize: size,
 			Body: body,
 		}
-		log.Printf("got a new packet: %v\n", p)
+		log.Printf("got a new packet: %+v\n", p)
 		c.in <- p
 	}
 }
@@ -111,12 +113,12 @@ func (c *Client) ioLoop(conn net.Conn) {
 						return
 					}
 
-					conn1, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", b.VPort))
+					conn1, err := net.Dial("tcp", b.RemoteAddr)
 					if err != nil {
 						log.Println(err)
 						return
 					}
-					conn2, err := net.Dial("tcp", fmt.Sprintf("127.0.0.1:%d", b.Port))
+					conn2, err := net.Dial("tcp", fmt.Sprintf(":%d", b.Port))
 					if err != nil {
 						log.Println(err)
 						return

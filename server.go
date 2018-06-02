@@ -85,7 +85,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", vport))
+		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", vport))
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
@@ -104,10 +104,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 				body := OpenPort{
 					Port:  int(port),
-					VPort: int(vport),
+					RemoteAddr: fmt.Sprintf("%s:%v", s.config.SIP(), vport),
 				}
 				bs, _ := json.Marshal(body)
 				p := &Packet{
+					Magic: MAGIC,
 					Version:  VERSION_1,
 					Reserved: uint16(0),
 					Cmd:      CMD_OPEN_PORT,
@@ -121,6 +122,7 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				if err != nil {
 					log.Println(err)
 				}
+
 				go func() {
 					if _, err := io.Copy(conn1, conn2); err != nil {
 						log.Println(err)
@@ -137,11 +139,11 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) startHTTP() {
-	log.Fatalln(http.ListenAndServe(s.config.ManageAddr, s))
+	log.Fatalln(http.ListenAndServe(s.config.ManageAddr(), s))
 }
 
 func (s *Server) startTCP() {
-	ln, err := net.Listen("tcp", s.config.ControlAddr)
+	ln, err := net.Listen("tcp", s.config.ControlAddr())
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -210,13 +212,13 @@ func (s *Server) readLoop(conn net.Conn) {
 		}
 
 		p := &Packet{
+			Magic: MAGIC,
 			Version: version,
 			Reserved: reserved,
 			Cmd: cmd,
 			BodySize: size,
 			Body: body,
 		}
-		log.Println("got new packet")
 		s.in <- &packetWithConn{p, conn}
 	}
 }

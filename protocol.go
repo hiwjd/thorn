@@ -12,6 +12,8 @@ const (
 )
 
 type Packet struct {
+	Magic byte
+
 	// 协议版本
 	Version byte
 
@@ -30,7 +32,7 @@ type Packet struct {
 
 func (p *Packet) ToBytes() []byte {
 	buf := make([]byte, 9 + p.BodySize)
-	buf[0] = MAGIC
+	buf[0] = p.Magic
 	buf[1] = p.Version
 	buf[2] = byte(p.Reserved >> 8)
 	buf[3] = byte(p.Reserved)
@@ -47,5 +49,5 @@ type RegClient struct {
 
 type OpenPort struct {
 	Port int
-	VPort int
+	RemoteAddr string
 }

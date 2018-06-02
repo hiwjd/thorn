@@ -20,7 +20,7 @@ func init()  {
 
 func main() {
 	flag.Parse()
-	config := thorn.ClientConfig{*clientID, *serverAddr}
+	config := thorn.NewClientConfig(*clientID, *serverAddr)
 	client := thorn.NewClient(config)
 
 	client.Start()

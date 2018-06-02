@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	manageHTTPAddr = flag.String("mAddr", "127.0.0.1:9991", "http addr provide manage server")
-	controlTCPAddr = flag.String("cAddr", "127.0.0.1:9992", "tcp addr provide control server")
+	sip = flag.String("sip", "127.0.0.1", "server ip")
+	mPort = flag.Int("mPort", 9991, "http port provide manage server")
+	cPort = flag.Int("cPort", 9992, "tcp addr provide control server")
 )
 
 func init()  {
@@ -20,7 +21,7 @@ func init()  {
 
 func main() {
 	flag.Parse()
-	config := thorn.NewServerConfig(*manageHTTPAddr, *controlTCPAddr)
+	config := thorn.NewServerConfig(*sip, *mPort, *cPort)
 	server := thorn.NewServer(config)
 
 	server.Start()

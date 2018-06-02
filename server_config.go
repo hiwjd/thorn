@@ -1,16 +1,34 @@
 package thorn
 
-type ServerConfig struct {
-	// http地址
-	ManageAddr  string
+import "fmt"
 
-	// 客户端连接地址
-	ControlAddr string
+type ServerConfig struct {
+	// server ip
+	sip string
+
+	// http port for manage
+	mPort  int
+
+	// tcp port for client to connect
+	cPort int
 }
 
-func NewServerConfig(mAddr string, cAddr string) ServerConfig {
+func NewServerConfig(sip string, mPort, cPort int) ServerConfig {
 	return ServerConfig{
-		ManageAddr:  mAddr,
-		ControlAddr: cAddr,
+		sip:  sip,
+		mPort: mPort,
+		cPort: cPort,
 	}
+}
+
+func (sc *ServerConfig) SIP() string {
+	return sc.sip
+}
+
+func (sc *ServerConfig) ManageAddr() string {
+	return fmt.Sprintf("%s:%d", sc.sip, sc.mPort)
+}
+
+func (sc *ServerConfig) ControlAddr() string {
+	return fmt.Sprintf("%s:%d", sc.sip, sc.cPort)
 }
