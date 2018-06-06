@@ -7,9 +7,8 @@ import (
 	"io"
 	"encoding/binary"
 	"strings"
-	"encoding/json"
 	"strconv"
-	"fmt"
+	"encoding/json"
 )
 
 // Server 处理这些事：
@@ -28,6 +27,7 @@ type Server struct {
 	bufSize int
 	cmdHandlers map[byte]CmdHandler
 	logic Logic
+	jobHub JobHub
 }
 
 type packetWithConn struct {
@@ -52,6 +52,7 @@ func NewServer(config ServerConfig) *Server {
 		cmdHandlers: cmdHandlers,
 	}
 	s.logic = NewLogic(s)
+	s.jobHub = NewJobHub(s)
 
 	return s
 }
@@ -69,72 +70,92 @@ func (s *Server) Stop() {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	path := strings.ToLower(r.Method + "#" + r.URL.Path)
 	switch path {
+	case "get#/jobs":
+		jobs := s.jobHub.Search(nil)
+		bs, err := json.Marshal(jobs)
+		if err != nil {
+			w.Write([]byte(err.Error()))
+		} else {
+			w.Write(bs)
+		}
 	case "post#/openport":
 		portStr := r.FormValue("port")
 		vportStr := r.FormValue("vport")
 		clientID := r.FormValue("clientID")
 
-		port, err := strconv.ParseInt(portStr, 10, 32)
+		port, err := strconv.Atoi(portStr)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
 		}
-		vport, err := strconv.ParseInt(vportStr, 10, 32)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		ln, err := net.Listen("tcp", fmt.Sprintf(":%d", vport))
+		vport, err := strconv.Atoi(vportStr)
 		if err != nil {
 			w.Write([]byte(err.Error()))
 			return
 		}
 
-		go func() {
-			// 正常情况有且只有两个连接
-			//   client的连接
-			//   使用方的连接
-			// 把这两个连接pipe起来
-			for {
-				conn1, err := ln.Accept()
-				if err != nil {
-					log.Println(err)
-				}
+		job := &Job{
+			Name: "",
+			ServerIP: s.config.SIP(),
+			VirtualPort: vport,
+			Port: port,
+			ClientID: clientID,
+		}
+		if err = s.jobHub.Run(job); err != nil {
+			w.Write([]byte(err.Error()))
+			return
+		}
 
-				body := OpenPort{
-					Port:  int(port),
-					RemoteAddr: fmt.Sprintf("%s:%v", s.config.SIP(), vport),
-				}
-				bs, _ := json.Marshal(body)
-				p := &Packet{
-					Magic: MAGIC,
-					Version:  VERSION_1,
-					Reserved: uint16(0),
-					Cmd:      CMD_OPEN_PORT,
-					BodySize: uint32(len(bs)),
-					Body:     bs,
-				}
-
-				s.out <- &packetWithClientID{p, clientID}
-
-				conn2, err := ln.Accept()
-				if err != nil {
-					log.Println(err)
-				}
-
-				go func() {
-					if _, err := io.Copy(conn1, conn2); err != nil {
-						log.Println(err)
-					}
-				}()
-				go func() {
-					if _, err := io.Copy(conn2, conn1); err != nil {
-						log.Println(err)
-					}
-				}()
-			}
-		}()
+		//ln, err := net.Listen("tcp", fmt.Sprintf(":%d", vport))
+		//if err != nil {
+		//	w.Write([]byte(err.Error()))
+		//	return
+		//}
+		//
+		//go func() {
+		//	// 正常情况有且只有两个连接
+		//	//   client的连接
+		//	//   使用方的连接
+		//	// 把这两个连接pipe起来
+		//	for {
+		//		conn1, err := ln.Accept()
+		//		if err != nil {
+		//			log.Println(err)
+		//		}
+		//
+		//		body := OpenPort{
+		//			Port:  int(port),
+		//			RemoteAddr: fmt.Sprintf("%s:%v", s.config.SIP(), vport),
+		//		}
+		//		bs, _ := json.Marshal(body)
+		//		p := &Packet{
+		//			Magic: MAGIC,
+		//			Version:  VERSION_1,
+		//			Reserved: uint16(0),
+		//			Cmd:      CMD_OPEN_PORT,
+		//			BodySize: uint32(len(bs)),
+		//			Body:     bs,
+		//		}
+		//
+		//		s.out <- &packetWithClientID{p, clientID}
+		//
+		//		conn2, err := ln.Accept()
+		//		if err != nil {
+		//			log.Println(err)
+		//		}
+		//
+		//		go func() {
+		//			if _, err := io.Copy(conn1, conn2); err != nil {
+		//				log.Println(err)
+		//			}
+		//		}()
+		//		go func() {
+		//			if _, err := io.Copy(conn2, conn1); err != nil {
+		//				log.Println(err)
+		//			}
+		//		}()
+		//	}
+		//}()
 	}
 }
 
