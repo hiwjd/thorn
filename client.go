@@ -7,6 +7,7 @@ import (
 	"io"
 	"encoding/binary"
 	"fmt"
+	"time"
 )
 
 // Client 做这些事情：
@@ -17,6 +18,8 @@ type Client struct {
 	config *ClientConfig
 	buf []byte
 	in chan *Packet
+	reSeconds time.Duration
+	conn net.Conn
 }
 
 func NewClient(config *ClientConfig) *Client {
@@ -24,21 +27,48 @@ func NewClient(config *ClientConfig) *Client {
 		config: config,
 		buf: make([]byte, 512),
 		in: make(chan *Packet, 16),
+		reSeconds: 3,
 	}
 }
 
 func (c *Client) Start() {
+	c.tryConnect()
+
+	go c.readLoop()
+	go c.ioLoop()
+}
+
+func (c *Client) Stop() {
+	if c.conn != nil {
+		c.conn.Close()
+	}
+	log.Println("client stop")
+}
+
+func (c *Client) tryConnect() {
+	err := c.connectServer()
+	for err != nil {
+		log.Printf("connect server error, try reconnect in %d seconds\n", c.reSeconds)
+		time.Sleep(c.reSeconds * time.Second)
+		err = c.connectServer()
+	}
+
+	log.Printf("reconnected to server.")
+}
+
+func (c *Client) connectServer() error {
 	conn, err := net.Dial("tcp", c.config.ServerAddr())
 	if err != nil {
 		log.Println(err)
-		return
+		return err
 	}
 
 	body := RegClient{c.config.ClientID()}
 	bs, err := json.Marshal(body)
 	if err != nil {
 		log.Println(err)
-		return
+		conn.Close()
+		return err
 	}
 
 	p := Packet{
@@ -52,23 +82,21 @@ func (c *Client) Start() {
 	_, err = conn.Write(p.ToBytes())
 	if err != nil {
 		log.Println(err)
-		return
+		conn.Close()
+		return err
 	}
 
-	go c.readLoop(conn)
-	go c.ioLoop(conn)
+	c.conn = conn
+	return nil
 }
 
-func (c *Client) Stop() {
-	log.Println("client stop")
-}
-
-func (c *Client) readLoop(conn net.Conn) {
+func (c *Client) readLoop() {
 	for {
 		header := c.buf[0:9]
-		_, err := io.ReadFull(conn, header)
+		_, err := io.ReadFull(c.conn, header)
 		if err != nil {
 			log.Println(err)
+			c.tryConnect()
 			break
 		}
 
@@ -82,7 +110,7 @@ func (c *Client) readLoop(conn net.Conn) {
 		cmd := header[4]
 		size := binary.BigEndian.Uint32(header[5:9])
 		body := c.buf[0:size]
-		if _, err := io.ReadFull(conn, body); err != nil {
+		if _, err := io.ReadFull(c.conn, body); err != nil {
 			log.Println("read body fail: " + err.Error())
 			break
 		}
@@ -100,7 +128,7 @@ func (c *Client) readLoop(conn net.Conn) {
 	}
 }
 
-func (c *Client) ioLoop(conn net.Conn) {
+func (c *Client) ioLoop() {
 	for {
 		select {
 		case p := <- c.in:
