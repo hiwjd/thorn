@@ -15,7 +15,7 @@ var (
 	cPort = flag.Int("cPort", 9992, "tcp addr provide control server")
 )
 
-func init()  {
+func init() {
 	log.SetFlags(log.Llongfile | log.LstdFlags)
 }
 
@@ -25,6 +25,7 @@ func main() {
 	server := thorn.NewServer(config)
 
 	server.Start()
+	log.Printf("\nthorn server started. \n\tserver ip: %s\n\tmanager port: %d\n\tcontrol port: %d\n", *sip, *mPort, *cPort)
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc,

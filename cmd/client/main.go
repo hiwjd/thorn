@@ -59,6 +59,7 @@ func main() {
 	client := thorn.NewClient(config)
 
 	client.Start()
+	log.Printf("\nthorn client started. \n\tclientID: %s\n", *clientID)
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc,
